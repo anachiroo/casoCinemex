@@ -1,0 +1,50 @@
+@startuml
+autonumber
+skinparam maxMessageSize 150
+
+actor "Usuario" as User
+boundary "InterfazWeb" as UI
+control "ControladorReserva" as Ctrl
+entity "Funcion" as Func
+entity "AsientoFuncion" as Asiento
+entity "Compra" as Compra
+entity "Boleto" as Boleto
+boundary "PasarelaPago" as Banco
+
+User -> UI : Selecciona horario de función
+UI -> Ctrl : solicitarMapaAsientos(idFuncion)
+Ctrl -> Func : consultarAsientosDisponibles()
+Func --> Ctrl : listaAsientos
+Ctrl --> UI : renderiza mapa interactivo
+
+User -> UI : Selecciona butacas (ej. F12, F13)
+UI -> Ctrl : solicitarBloqueo(idFuncion, asientos)
+Ctrl -> Asiento : bloquearTemporalmente()
+Asiento --> Ctrl : true (estado = "EN_PROCESO")
+Ctrl -> Compra : calcularTotal()
+Compra --> Ctrl : montoTotal
+Ctrl --> UI : muestra Resumen de Compra y Total
+
+User -> UI : Ingresa datos de tarjeta y confirma
+UI -> Ctrl : iniciarCheckout(compra, datosPago)
+Ctrl -> Banco : solicitarAutorizacionCargo(datosPago, montoTotal)
+
+alt Caso de Éxito (Pago Aprobado)
+    Banco --> Ctrl : transaccionAprobada
+    Ctrl -> Asiento : marcarComoVendido()
+    Ctrl -> Compra : confirmarCompra()
+    Compra -> Boleto : generarQR()
+    Boleto --> Compra : boletosDigitales
+    Compra --> Ctrl : listaBoletos
+    Ctrl --> UI : enviaBoletosQR()
+    UI --> User : Muestra pantalla de éxito y boletos
+    
+else Caso de Fallo (Fondos Insuficientes o Tiempo Expirado)
+    Banco --> Ctrl : transaccionRechazada
+    Ctrl -> Asiento : liberarAsiento()
+    Ctrl -> Compra : cancelarCompra()
+    Ctrl --> UI : retornaMensajeError()
+    UI --> User : Muestra alerta: "Pago fallido, intenta de nuevo"
+end
+
+@enduml
